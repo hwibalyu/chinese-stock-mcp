@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     eastmoney_suggest_token: str = Field(
         default="D43BF722C8E33BDC906FB84D85E326E8"
     )
+    eastmoney_xuangu_fingerprint: str = Field(
+        default="6d09ac0e7326d9299bb77ac2090dadd9"
+    )
     http_timeout_seconds: float = 15.0
     user_agent: str = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

@@ -10,6 +10,8 @@ from src.schemas.fundamentals import (
     TableData,
 )
 from src.schemas.notice import NoticeFacts, NoticeItem, NoticeList, NoticeTextPage
+from src.schemas.screening import ScreeningColumn, ScreeningItem, ScreeningResult
+from src.services.identifiers import build_identifier
 
 
 def _to_float(value: object) -> float | None:
@@ -19,6 +21,21 @@ def _to_float(value: object) -> float | None:
         return float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _market_from_screening_row(stock_code: str, market_short_name: str | None) -> str:
+    if market_short_name:
+        if "京" in market_short_name:
+            return "BJ"
+        if "沪" in market_short_name:
+            return "SH"
+        if "深" in market_short_name:
+            return "SZ"
+    if stock_code.startswith("92") or stock_code.startswith(("4", "8")):
+        return "BJ"
+    if stock_code.startswith(("5", "6", "9")):
+        return "SH"
+    return "SZ"
 
 
 def normalize_notice_list(
@@ -136,6 +153,67 @@ def normalize_table_data(
             item = dict(row)
         rows.append(item)
     return TableData(identifier=identifier, report_name=report_name, rows=rows)
+
+
+def normalize_screening_result(
+    query: str, payload: dict, page_no: int, page_size: int
+) -> ScreeningResult:
+    data = payload.get("data") or {}
+    result = data.get("result") or {}
+    columns = [
+        ScreeningColumn(
+            key=column.get("key", ""),
+            title=column.get("title", ""),
+            unit=column.get("unit"),
+            date_msg=column.get("dateMsg"),
+            sortable=bool(column.get("sortable")),
+            sort_way=column.get("sortWay"),
+            user_need=column.get("userNeed"),
+        )
+        for column in result.get("columns", [])
+        if column.get("key") and column.get("title")
+    ]
+    base_keys = {"SERIAL", "SECURITY_CODE", "SECURITY_SHORT_NAME", "MARKET_SHORT_NAME"}
+    column_titles = {column.key: column.title for column in columns}
+    items: list[ScreeningItem] = []
+    for row in result.get("dataList", []):
+        stock_code = str(row.get("SECURITY_CODE") or "").strip()
+        if not stock_code.isdigit() or len(stock_code) != 6:
+            continue
+        short_name = row.get("SECURITY_SHORT_NAME")
+        market_short_name = row.get("MARKET_SHORT_NAME")
+        identifier = build_identifier(
+            stock_code,
+            short_name=short_name,
+            company_name=short_name,
+            market=_market_from_screening_row(stock_code, market_short_name),
+            source="xuangu",
+        )
+        metrics: dict[str, object] = {}
+        for key, value in row.items():
+            if key in base_keys or value in ("", None):
+                continue
+            metrics[column_titles.get(key, key)] = value
+        items.append(
+            ScreeningItem(
+                identifier=identifier,
+                name=short_name,
+                market_short_name=market_short_name,
+                last_price=_to_float(row.get("NEWEST_PRICE")),
+                change_percent=_to_float(row.get("CHG")),
+                metrics=metrics,
+            )
+        )
+    return ScreeningResult(
+        query=query,
+        total=int(result.get("total", 0) or 0),
+        page_no=page_no,
+        page_size=page_size,
+        columns=columns,
+        items=items,
+        xc_id=data.get("xcId"),
+        trace_id=data.get("traceId"),
+    )
 
 
 def build_notice_facts(

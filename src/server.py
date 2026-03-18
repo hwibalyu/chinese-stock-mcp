@@ -10,12 +10,14 @@ from src.clients.datacenter import DatacenterClient
 from src.clients.notices import NoticeClient
 from src.clients.push2 import Push2Client
 from src.clients.search import SearchClient
+from src.clients.xuangu import XuanguClient
 from src.services.notice_reader import NoticeReader
 from src.settings import get_settings
 from src.tools.f10_tools import register_f10_tools
 from src.tools.notice_tools import register_notice_tools
 from src.tools.qa_tools import register_qa_tools
 from src.tools.quote_tools import register_quote_tools
+from src.tools.screening_tools import register_screening_tools
 from src.tools.search_tools import register_search_tools
 
 settings = get_settings()
@@ -32,10 +34,12 @@ push2_client = Push2Client()
 notice_client = NoticeClient()
 datacenter_client = DatacenterClient()
 search_client = SearchClient()
+xuangu_client = XuanguClient()
 dataapi_client = DataApiClient()
 notice_reader = NoticeReader(notice_client)
 
-register_search_tools(server, search_client)
+register_search_tools(server, search_client, xuangu_client)
+register_screening_tools(server, xuangu_client)
 register_quote_tools(server, push2_client)
 register_notice_tools(server, notice_client, notice_reader)
 register_f10_tools(server, datacenter_client, dataapi_client)
@@ -47,6 +51,7 @@ async def _shutdown() -> None:
     await notice_client.close()
     await datacenter_client.close()
     await search_client.close()
+    await xuangu_client.close()
     await dataapi_client.close()
 
 

@@ -6,6 +6,8 @@ from src.schemas.common import StockIdentifier
 
 
 def market_from_code(stock_code: str) -> str:
+    if stock_code.startswith("92") or stock_code.startswith(("4", "8")):
+        return "BJ"
     if stock_code.startswith(("5", "6", "9")):
         return "SH"
     return "SZ"
@@ -33,15 +35,17 @@ def build_identifier(
     stock_code: str,
     short_name: str | None = None,
     company_name: str | None = None,
+    market: str | None = None,
     source: str = "inferred",
 ) -> StockIdentifier:
     normalized = normalize_stock_code(stock_code)
-    market = market_from_code(normalized)
+    resolved_market = market or market_from_code(normalized)
+    prefix = "1" if resolved_market == "SH" else "0"
     return StockIdentifier(
         stock_code=normalized,
-        market=market,
-        secid=secid_from_code(normalized),
-        symbol=f"{market}{normalized}",
+        market=resolved_market,
+        secid=f"{prefix}.{normalized}",
+        symbol=f"{resolved_market}{normalized}",
         short_name=short_name,
         company_name=company_name or short_name,
         source=source,

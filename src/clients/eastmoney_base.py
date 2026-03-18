@@ -40,6 +40,22 @@ class EastmoneyBaseClient:
         reraise=True,
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=0.5, min=0.5, max=4),
+        retry=retry_if_exception_type((httpx.HTTPError, ValueError)),
+    )
+    async def post_json(
+        self,
+        url: str,
+        payload: dict[str, Any],
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        response = await self._client.post(url, params=params, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    @retry(
+        reraise=True,
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.5, min=0.5, max=4),
         retry=retry_if_exception_type((httpx.HTTPError, ValueError, json.JSONDecodeError)),
     )
     async def get_jsonp(
